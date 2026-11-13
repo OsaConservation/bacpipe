@@ -1,0 +1,258 @@
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+import pandas as pd
+from pathlib import Path
+
+import logging
+
+logger = logging.getLogger("bacpipe")
+
+
+class ProbeDatasetLoader(Dataset):
+    """
+    PyTorch Dataset yielding embedding/label pairs for probe classification.
+    """
+
+    def __init__(self, class_df, embeds, label2index, set_name=None, **kwargs):
+        """
+        Class to initialize and iterate through classification dataset.
+
+        Parameters
+        ----------
+        class_df : pd.DataFrame
+            classification dataframe
+        embeds : np.array
+            embeddings
+        label2index : dict
+            linking labels to integers
+        set_name : string, optional
+            train, test or val set, by default None
+        """
+        if set_name is not None:
+            self.dataset = class_df[class_df.predefined_set == set_name]
+        else:
+            self.dataset = class_df
+
+        logger.info(
+            f"Found {len(self.dataset)} samples in the {set_name} set with "
+            f"{len(self.dataset.label.unique())} unique labels."
+        )
+        self.embeds = embeds
+
+        self.label2index = label2index
+
+        self.dataset = self.dataset.sample(frac=1, random_state=42)
+
+    def __len__(self):
+        """
+        Get the number of samples in the dataset.
+
+        Returns
+        -------
+        int
+            number of samples in the dataset
+        """
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        """
+        Iterate through dataset.
+
+        Parameters
+        ----------
+        idx : int
+            index of training step
+
+        Returns
+        -------
+        tuple
+            (embedding, true label)
+        """
+        X = self.embeds[self.dataset.index[idx]]
+        X = X.reshape(1, -1)
+
+        if X.shape[0] > 1:
+            X = np.mean(X, axis=0)
+        else:
+            X = X.flatten()
+        y = self.label2index[self.dataset.label.values[idx]]
+
+        return X, y
+
+
+def probe_dataset_loader(
+    set_name,
+    clean_df,
+    embeds,
+    label2index,
+    batch_size=64,
+    shuffle=False,
+    **kwargs,
+):
+    """
+    Create dataset loader object for classification.
+
+    Parameters
+    ----------
+    set_name : string
+        train, test of val set
+    clean_df : pd.DataFrame
+        classification dataframe
+    embeds : np.array
+        embeddings
+    label2index : dict
+        link labels to ints
+    batch_size : int, optional
+        number of embeddings per batch, by default 64
+    shuffle : bool, optional
+        shuffle or not, by default False
+
+    Returns
+    -------
+    DataLoader obj
+        dataset loader object to iterate over during training
+    """
+    loader = ProbeDatasetLoader(
+        class_df=clean_df,
+        set_name=set_name,
+        embeds=embeds,
+        label2index=label2index,
+        **kwargs,
+    )
+
+    loader_generator = DataLoader(
+        loader, batch_size=batch_size, shuffle=shuffle, drop_last=False
+    )
+    return loader_generator
+
+
+def generate_annotations_for_probing_task(
+    ground_truth,
+    paths,
+    label_column,
+    dataset_csv_path="probing_dataframe.csv",
+    train_ratio=None,
+    test_ratio=None,
+    seed=42,
+    **kwargs,
+):
+    """
+    Generate the probing annotations dataframe from the ground truth. The
+    labels are determined from the simultaneous labels in the ground truth
+    and the samples are split into train, test and validation sets per
+    species. If the dataframe already exists, it is loaded instead.
+
+    Parameters
+    ----------
+    ground_truth : pandas.DataFrame
+        ground truth dataframe containing the species labels
+    paths : SimpleNamespace
+        object with the paths used for saving the probing dataframe
+    label_column : str
+        name of the label column
+    dataset_csv_path : str, optional
+        path to the probing dataframe csv file, by default
+        "probing_dataframe.csv". Relative paths are resolved against
+        ``paths.labels_path`` when a ``paths`` object is available.
+    train_ratio : float, optional
+        proportion of samples used for training, by default None
+    test_ratio : float, optional
+        proportion of samples used for testing, by default None
+    seed : int, optional
+        random seed used for shuffling, by default 42
+
+    Returns
+    -------
+    pandas.DataFrame
+        probing annotations dataframe
+    """
+    import bacpipe
+
+    if train_ratio is None:
+        train_ratio = bacpipe.settings.train_ratio
+    if test_ratio is None:
+        test_ratio = bacpipe.settings.test_ratio
+
+    # The probing dataframe is cached inside the labels directory of the model
+    # evaluation results whenever a ``paths`` object is available. Relative
+    # ``dataset_csv_path`` values (e.g. ``probing_dataframe.csv`` from the probe
+    # configs in settings.yaml) are therefore resolved against ``labels_path``.
+    if paths is not None:
+        dataset_csv_path = Path(dataset_csv_path)
+        if not dataset_csv_path.is_absolute():
+            dataset_csv_path = Path(paths.labels_path) / dataset_csv_path
+
+    # Isolate the cached probing dataframe per ``only_embed_annotations`` mode
+    # so that switching modes with ``overwrite=False`` does not silently reuse
+    # a dataframe that was generated for the other mode.
+    if kwargs.get("only_embed_annotations"):
+        dataset_csv_path = Path(dataset_csv_path)
+        if not dataset_csv_path.name.endswith("_only_annotated.csv"):
+            dataset_csv_path = dataset_csv_path.with_name(
+                dataset_csv_path.stem + "_only_annotated.csv"
+            )
+
+    if paths is None or not Path(dataset_csv_path).exists():
+        rng = np.random.default_rng(seed=seed)
+
+        non_species_labels = [
+            "start",
+            "end",
+            "audiofilename",
+            "simultaneous_labels",
+        ]
+        species = ground_truth.drop(columns=non_species_labels).columns
+
+        active_starts = ground_truth.simultaneous_labels == 1
+        gt_4_probing = ground_truth[active_starts.values]
+        gt_4_probing.index = range(len(gt_4_probing))
+
+        gt_4_probing_only_species_columns = gt_4_probing.drop(
+            columns=non_species_labels
+        )
+
+        active_labels = gt_4_probing_only_species_columns.idxmax(axis=1).values
+
+        df = pd.DataFrame()
+
+        if not paths is None:
+            filenames = gt_4_probing["audiofilename"]
+            starts, ends = gt_4_probing["start"], gt_4_probing["end"]
+            df["audiofilename"] = filenames
+            df["start"] = starts
+            df["end"] = ends
+
+        df["label"] = active_labels
+        df.index = range(len(df))
+        df["predefined_set"] = "undefined"
+        for v in species:
+            num_species_occurances = gt_4_probing[v].sum()
+            ar = gt_4_probing[gt_4_probing[v] == 1].index.values.tolist()
+            rng.shuffle(ar)
+            tr_ar = ar[: int(num_species_occurances * train_ratio)]
+            te_ar = ar[
+                int(num_species_occurances * train_ratio) : int(
+                    num_species_occurances * (train_ratio + test_ratio)
+                )
+            ]
+            va_ar = ar[
+                int(num_species_occurances * (train_ratio + test_ratio)) :
+            ]
+            if not all([len(tr_ar) > 0, len(te_ar) > 0, len(va_ar) > 0]):
+                continue
+            df.loc[tr_ar, "predefined_set"] = "train"
+            df.loc[te_ar, "predefined_set"] = "test"
+            df.loc[va_ar, "predefined_set"] = "val"
+
+        df = df.sort_values(by=["audiofilename", "start"])
+
+        Path(dataset_csv_path).parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(dataset_csv_path, index=False)
+    else:
+        logger.info(
+            f"\nFound file: {str(dataset_csv_path)}. Loading dataframe probing "
+            "dataframe. If you would like to automatically create a new probing "
+            "dataframe. Please delete the existing one.\n"
+        )
+        df = pd.read_csv(dataset_csv_path, index_col=False)
+    return df

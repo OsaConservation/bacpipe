@@ -1,0 +1,134 @@
+{
+    "PHYLLOMEDUSIDAE": {
+        "Agalychnis": {
+            "annae": {},
+            "callidryas": {},
+            "spurrelli": {}
+        }
+    },
+    "AROMOBATIDAE": {
+        "Allobates": {
+            "talamancae": {}
+        }
+    },
+    "BUFONIDAE": {
+        "Atelopus": {
+            "varius": {}
+        },
+        "Incilius": {
+            "aucoinae": {},
+            "coniferus": {},
+            "melanochlorus": {}
+        },
+        "Rhaebo": {
+            "haematiticus": {}
+        },
+        "Rhinella": {
+            "horribilis": {}
+        }
+    },
+    "HYLIDAE": {
+        "Boana": {
+            "rosenbergi": {}
+        },
+        "Dendropsophus": {
+            "ebraccatus": {},
+            "microcephalus": {}
+        },
+        "Scinax": {
+            "boulengeri": {},
+            "elaeochroa": {}
+        },
+        "Smilisca": {
+            "baudinii": {},
+            "phaeota": {},
+            "sila": {},
+            "sordida": {}
+        },
+        "Trachycephalus": {
+            "typhonius": {}
+        },
+        "Triprion": {
+            "spinosus": {}
+        }
+    },
+    "CENTROLENIDAE": {
+        "Cochranella": {
+            "granulosa": {}
+        },
+        "Espadarana": {
+            "prosoblepon": {}
+        },
+        "Hyalinobatrachium": {
+            "colymbiphyllum": {},
+            "fleischmanni": {},
+            "valerioi": {}
+        },
+        "Sachatamia": {
+            "albomaculata": {}
+        },
+        "Teratohyla": {
+            "pulverata": {}
+        }
+    },
+    "CRAUGASTORIDAE": {
+        "Craugastor": {
+            "crassidigitus": {},
+            "fitzingeri": {},
+            "rugosus": {},
+            "stejnegerianus": {},
+            "taurus": {}
+        },
+        "Pristimantis": {
+            "cruentus": {},
+            "pardalis": {},
+            "ridens": {}
+        }
+    },
+    "MICROHYLIDAE": {
+        "Ctenophryne": {
+            "aterrima": {}
+        },
+        "Elachistocleis": {
+            "pearsei": {}
+        }
+    },
+    "DENDROBATIDAE": {
+        "Dendrobates": {
+            "auratus": {}
+        },
+        "Oophaga": {
+            "granulifera": {}
+        },
+        "Phyllobates": {
+            "vittatus": {}
+        },
+        "Silverstoneia": {
+            "flotator": {}
+        }
+    },
+    "ELEUTHERODACTYLIDAE": {
+        "Diasporus": {
+            "diastema": {},
+            "vocator": {}
+        }
+    },
+    "LEPTODACTYLIDAE": {
+        "Engystomops": {
+            "pustulosus": {}
+        },
+        "Leptodactylus": {
+            "bolivianus": {},
+            "fragilis": {},
+            "insularum": {},
+            "melanonotus": {},
+            "poecilochilus": {},
+            "savagei": {}
+        }
+    },
+    "RANIDAE": {
+        "Lithobates": {
+            "warszewitschii": {}
+        }
+    }
+}
